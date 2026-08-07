@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ramen</title>
+
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" type="image/png" href="icon.png">
+
+<!-- Necesario para exportar e importar archivos Excel (.xlsx). -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+:root{
+  --bg:#FAF7F2;
+  --card:#FFFFFF;
+  --text:#2F2A26;
+  --muted:#7B6D62;
+  --border:#E6DDD4;
+  --accent:#B85C38;
+  --accent2:#D98E5F;
+  --danger:#B23A48;
+  --dangerBg:#F9E7E9;
+  --success:#409176;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#241914;
+    --card:#30231D;
+    --text:#FFF7EF;
+    --muted:#D6BFAE;
+    --border:#4A372E;
+    --accent:#D98E5F;
+    --accent2:#F0B27A;
+    --danger:#FF9AA8;
+    --dangerBg:#4A222A;
+    --success:#66B99A;
+  }
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  max-width:700px;
+  margin:20px auto;
+  padding:15px;
+  background:linear-gradient(180deg,var(--bg),#FFFDF9);
+  color:var(--text);
+}
+@media (prefers-color-scheme:dark){
+  body{background:var(--bg);}
+}
+h1{font-size:28px;margin:0 0 2px}
+h3{margin:0 0 12px}
+.brand-subtitle{margin-bottom:4px;color:var(--muted);font-size:14px}
+.title-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom:14px;
+}
+.header-actions{text-align:right}
+.periodo-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.periodo-label{
+  font-size:13px;
+  color:var(--muted);
+  margin-top:8px;
+}
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:16px;
+  margin-bottom:15px;
+  box-shadow:0 3px 12px rgba(96,58,32,.08);
+}
+input,select,button{
+  padding:12px;
+  font-size:16px;
+  margin:6px 0;
+  width:100%;
+  box-sizing:border-box;
+  border-radius:10px;
+  border:1px solid var(--border);
+}
+input,select{
+  background:var(--card);
+  color:var(--text);
+}
+input:disabled,select:disabled{
+  opacity:.65;
+}
+button{
+  cursor:pointer;
+  border:none;
+  background:var(--accent);
+  color:white;
+  font-weight:600;
+}
+button:disabled{
+  opacity:.6;
+  cursor:not-allowed;
+}
+button.danger{
+  width:auto;
+  font-size:12px;
+  padding:6px 10px;
+  background:var(--dangerBg);
+  color:var(--danger);
+  border:1px solid rgba(178,58,72,.25);
+}
+button.reset,
+button.secondary{
+  width:auto;
+  font-size:12px;
+  padding:6px 10px;
+  background:rgba(230,221,212,.55);
+  color:var(--muted);
+  border:1px solid var(--border);
+}
+.saldo{
+  font-size:34px;
+  font-weight:800;
+  margin-top:6px;
+}
+.negative{color:var(--danger)}
+.item{
+  border-top:1px solid var(--border);
+  padding:12px 0;
+}
+.item:first-child{border-top:none}
+.small{
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.45;
+}
+.row{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+}
+.progress{
+  height:12px;
+  background:rgba(127,127,127,.18);
+  border-radius:999px;
+  overflow:hidden;
+  margin:12px 0 6px;
+}
+.progress-bar{
+  height:100%;
+  width:0%;
+  transition:width .25s ease, background .25s ease;
+}
+.budget-message{
+  margin-top:6px;
+  font-size:13px;
+}
+.backup-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+@media(max-width:520px){
+  .backup-actions{grid-template-columns:1fr}
+}
+#toast{
+  display:none;
+  position:fixed;
+  bottom:32px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#111;
+  color:white;
+  padding:16px 22px;
+  border-radius:18px;
+  z-index:100;
+  font-size:17px;
+  font-weight:700;
+  text-align:center;
+  min-width:220px;
+  max-width:80%;
+  box-shadow:0 8px 24px rgba(0,0,0,.22);
+}
+#toast .toast-small{
+  display:block;
+  margin-top:5px;
+  font-size:13px;
+  font-weight:500;
+  opacity:.86;
+}
+</style>
+</head>
+
+<body>
+
+<div class="title-row">
+  <div>
+    <h1>Ramen</h1>
+    <div class="brand-subtitle">by TarTeTaTin</div>
+  </div>
+
+  <div class="header-actions">
+    <button class="reset" onclick="reiniciarPresupuesto()">
+      BORRAR PRESUPUESTO
+    </button>
+  </div>
+</div>
+
+<div class="card">
+  <label>Presupuesto inicial</label>
+
+  <div class="small" id="textoPresupuesto">
+    Selecciona mes y año. Una vez guardado, el presupuesto queda bloqueado.
+  </div>
+
+  <div class="periodo-grid">
+    <div>
+      <div class="periodo-label">Mes</div>
+      <select id="periodoMes">
+        <option value="">Seleccionar mes</option>
+        <option value="Enero">Enero</option>
+        <option value="Febrero">Febrero</option>
+        <option value="Marzo">Marzo</option>
+        <option value="Abril">Abril</option>
+        <option value="Mayo">Mayo</option>
+        <option value="Junio">Junio</option>
+        <option value="Julio">Julio</option>
+        <option value="Agosto">Agosto</option>
+        <option value="Septiembre">Septiembre</option>
+        <option value="Octubre">Octubre</option>
+        <option value="Noviembre">Noviembre</option>
+        <option value="Diciembre">Diciembre</option>
+      </select>
+    </div>
+
+    <div>
+      <div class="periodo-label">Año</div>
+      <select id="periodoAnio">
+        <option value="">Seleccionar año</option>
+        <option value="2026">2026</option>
+        <option value="2027">2027</option>
+        <option value="2028">2028</option>
+        <option value="2029">2029</option>
+        <option value="2030">2030</option>
+        <option value="2031">2031</option>
+        <option value="2032">2032</option>
+        <option value="2033">2033</option>
+        <option value="2034">2034</option>
+        <option value="2035">2035</option>
+        <option value="2036">2036</option>
+      </select>
+    </div>
+  </div>
+
+  <input
+    type="text"
+    inputmode="numeric"
+    pattern="[0-9.]*"
+    id="presupuestoInicial"
+    placeholder="Ej. 500.000"
+  >
+
+  <button id="botonPresupuesto" onclick="guardarPresupuesto()">
+    Guardar presupuesto
+  </button>
+</div>
+
+<div class="card">
+  <div>Período</div>
+  <div class="small" id="periodoActual">Sin definir</div>
+
+  <br>
+
+  <div>Saldo disponible</div>
+  <div class="saldo" id="saldoDisponible">$0</div>
+
+  <div class="progress">
+    <div class="progress-bar" id="barraPresupuesto"></div>
+  </div>
+
+  <div class="small" id="porcentajeDisponible">0% disponible</div>
+  <div class="budget-message" id="mensajePresupuesto"></div>
+</div>
+
+<div class="card">
+  <h3>Registrar gasto</h3>
+
+  <input
+    type="text"
+    inputmode="numeric"
+    pattern="[0-9.]*"
+    id="monto"
+    placeholder="Monto"
+  >
+
+  <input
+    type="text"
+    id="descripcion"
+    placeholder="Descripción"
+  >
+
+  <button onclick="agregarGasto()">Agregar gasto</button>
+</div>
+
+<div class="card">
+  <h3>Respaldo Excel</h3>
+
+  <div class="backup-actions">
+    <button class="secondary" onclick="exportarExcel()">
+      Exportar Excel
+    </button>
+
+    <button
+      class="secondary"
+      onclick="document.getElementById('archivoExcel').click()"
+    >
+      Importar Excel
+    </button>
+  </div>
+
+  <input
+    type="file"
+    id="archivoExcel"
+    accept=".xlsx,.xls"
+    style="display:none"
+    onchange="importarExcel(event)"
+  >
+
+  <div class="small">
+    El archivo incluye el presupuesto, el período y todos los gastos.
+    Al importar, reemplaza los datos actuales después de pedir confirmación.
+  </div>
+</div>
+
+<div class="card">
+  <h3>Historial</h3>
+  <div id="historial"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/*
+  Se conservan exactamente las mismas claves de localStorage
+  de la versión anterior para no perder los datos ya registrados.
+*/
+let presupuestoInicial = Number(
+  localStorage.getItem("presupuestoInicial") || 0
+);
+
+let periodoMes =
+  localStorage.getItem("periodoMes") || "";
+
+let periodoAnio =
+  localStorage.getItem("periodoAnio") || "";
+
+let gastos = JSON.parse(
+  localStorage.getItem("gastos") || "[]"
+);
+
+
+function formato(n){
+  const signo = n < 0 ? "-" : "";
+
+  return signo +
+    "$" +
+    Math.abs(Math.round(n)).toLocaleString("es-CL");
+}
+
+
+function formatearMiles(input){
+  const digitos = input.value.replace(/\D/g, "");
+
+  if(!digitos){
+    input.value = "";
+    return;
+  }
+
+  input.value =
+    Number(digitos).toLocaleString("es-CL");
+}
+
+
+function leerMonto(input){
+  const limpio =
+    input.value.replace(/\D/g, "");
+
+  return Number(limpio || 0);
+}
+
+
+function guardar(){
+  localStorage.setItem(
+    "presupuestoInicial",
+    presupuestoInicial
+  );
+
+  localStorage.setItem(
+    "periodoMes",
+    periodoMes
+  );
+
+  localStorage.setItem(
+    "periodoAnio",
+    periodoAnio
+  );
+
+  localStorage.setItem(
+    "gastos",
+    JSON.stringify(gastos)
+  );
+}
+
+
+function saldoDisponible(){
+  return presupuestoInicial -
+    gastos.reduce(
+      (total,gasto) =>
+        total + Number(gasto.monto || 0),
+      0
+    );
+}
+
+
+function guardarPresupuesto(){
+  if(presupuestoInicial > 0){
+    alert(
+      "El presupuesto ya está guardado. " +
+      "Para cambiarlo, reinicia el presupuesto."
+    );
+    return;
+  }
+
+  periodoMes =
+    document.getElementById("periodoMes").value;
+
+  periodoAnio =
+    document.getElementById("periodoAnio").value;
+
+  presupuestoInicial = leerMonto(
+    document.getElementById("presupuestoInicial")
+  );
+
+  if(!periodoMes){
+    alert("Selecciona mes.");
+    return;
+  }
+
+  if(!periodoAnio){
+    alert("Selecciona año.");
+    return;
+  }
+
+  if(!presupuestoInicial || presupuestoInicial <= 0){
+    alert("Ingresa un presupuesto válido.");
+    return;
+  }
+
+  guardar();
+  render();
+
+  toast(
+    "Presupuesto guardado",
+    "Monto inicial: " + formato(presupuestoInicial)
+  );
+}
+
+
+function toast(titulo, detalle=""){
+  const t =
+    document.getElementById("toast");
+
+  t.innerHTML = detalle
+    ? titulo +
+      '<span class="toast-small">' +
+      detalle +
+      "</span>"
+    : titulo;
+
+  t.style.display = "block";
+
+  clearTimeout(window.ramenToastTimer);
+
+  window.ramenToastTimer =
+    setTimeout(() => {
+      t.style.display = "none";
+    }, 3000);
+}
+
+
+function agregarGasto(){
+  const montoInput =
+    document.getElementById("monto");
+
+  const descripcionInput =
+    document.getElementById("descripcion");
+
+  const monto =
+    leerMonto(montoInput);
+
+  const descripcion =
+    descripcionInput.value.trim();
+
+  if(!presupuestoInicial || presupuestoInicial <= 0){
+    alert("Primero guarda un presupuesto.");
+    return;
+  }
+
+  if(!monto || monto <= 0){
+    alert("Ingresa un monto válido.");
+    montoInput.focus();
+    return;
+  }
+
+  gastos.unshift({
+    id:
+      Date.now().toString() +
+      "-" +
+      Math.random().toString(16).slice(2),
+
+    fecha:
+      new Date().toLocaleString("es-CL"),
+
+    monto,
+    descripcion
+  });
+
+  guardar();
+  render();
+
+  montoInput.value = "";
+  descripcionInput.value = "";
+
+  /*
+    El cursor vuelve inmediatamente al monto para
+    poder registrar varios gastos seguidos.
+  */
+  setTimeout(() => {
+    montoInput.focus();
+  }, 0);
+
+  toast(
+    "✓ Gasto registrado",
+    "Saldo disponible: " + formato(saldoDisponible())
+  );
+}
+
+
+function anularGasto(id){
+  if(!confirm("¿Anular este gasto?")){
+    return;
+  }
+
+  gastos =
+    gastos.filter(gasto => gasto.id !== id);
+
+  guardar();
+  render();
+
+  toast(
+    "Gasto anulado",
+    "Saldo disponible: " + formato(saldoDisponible())
+  );
+}
+
+
+function reiniciarPresupuesto(){
+  if(!confirm(
+    "Esto borrará el presupuesto y todos los gastos. ¿Continuar?"
+  )){
+    return;
+  }
+
+  if(!confirm(
+    "Última confirmación. Esta acción no se puede deshacer."
+  )){
+    return;
+  }
+
+  presupuestoInicial = 0;
+  periodoMes = "";
+  periodoAnio = "";
+  gastos = [];
+
+  guardar();
+
+  document.getElementById(
+    "presupuestoInicial"
+  ).value = "";
+
+  document.getElementById(
+    "periodoMes"
+  ).value = "";
+
+  document.getElementById(
+    "periodoAnio"
+  ).value = "";
+
+  render();
+
+  document.getElementById(
+    "presupuestoInicial"
+  ).focus();
+}
+
+
+function calcularSaldosHistoricos(){
+  let saldo = presupuestoInicial;
+
+  const cronologico =
+    [...gastos].reverse();
+
+  const saldos = {};
+
+  cronologico.forEach(gasto => {
+    saldo -= Number(gasto.monto || 0);
+    saldos[gasto.id] = saldo;
+  });
+
+  return saldos;
+}
+
+
+function comprobarExcel(){
+  if(typeof XLSX === "undefined"){
+    alert(
+      "No se pudo cargar la herramienta de Excel. " +
+      "Revisa la conexión a internet e inténtalo nuevamente."
+    );
+    return false;
+  }
+
+  return true;
+}
+
+
+function exportarExcel(){
+  if(!comprobarExcel()){
+    return;
+  }
+
+  const saldos =
+    calcularSaldosHistoricos();
+
+  const configuracion = [
+    ["Campo","Valor"],
+    ["Aplicación","Ramen"],
+    [
+      "Período",
+      periodoMes && periodoAnio
+        ? periodoMes + " " + periodoAnio
+        : ""
+    ],
+    ["Mes",periodoMes],
+    ["Año",periodoAnio],
+    ["Presupuesto inicial",presupuestoInicial],
+    ["Saldo disponible",saldoDisponible()],
+    [
+      "Fecha de exportación",
+      new Date().toLocaleString("es-CL")
+    ]
+  ];
+
+  const filasGastos = [
+    [
+      "ID",
+      "Fecha",
+      "Descripción",
+      "Monto",
+      "Saldo después del gasto"
+    ]
+  ];
+
+  /*
+    En el Excel se muestran cronológicamente:
+    del gasto más antiguo al más reciente.
+  */
+  gastos
+    .slice()
+    .reverse()
+    .forEach(gasto => {
+      filasGastos.push([
+        gasto.id,
+        gasto.fecha,
+        gasto.descripcion || "",
+        Number(gasto.monto),
+        Number(saldos[gasto.id])
+      ]);
+    });
+
+  const libro =
+    XLSX.utils.book_new();
+
+  const hojaConfiguracion =
+    XLSX.utils.aoa_to_sheet(configuracion);
+
+  const hojaGastos =
+    XLSX.utils.aoa_to_sheet(filasGastos);
+
+  hojaConfiguracion["!cols"] = [
+    {wch:24},
+    {wch:30}
+  ];
+
+  hojaGastos["!cols"] = [
+    {wch:28},
+    {wch:22},
+    {wch:36},
+    {wch:15},
+    {wch:24}
+  ];
+
+  XLSX.utils.book_append_sheet(
+    libro,
+    hojaConfiguracion,
+    "Configuración"
+  );
+
+  XLSX.utils.book_append_sheet(
+    libro,
+    hojaGastos,
+    "Gastos"
+  );
+
+  const periodoArchivo =
+    periodoMes && periodoAnio
+      ? periodoMes.toLowerCase() +
+        "-" +
+        periodoAnio
+      : new Date()
+          .toISOString()
+          .slice(0,10);
+
+  XLSX.writeFile(
+    libro,
+    "ramen-" +
+      periodoArchivo +
+      ".xlsx"
+  );
+
+  toast(
+    "Excel exportado",
+    gastos.length +
+      " gasto" +
+      (gastos.length === 1 ? "" : "s")
+  );
+}
+
+
+function importarExcel(event){
+  const archivo =
+    event.target.files[0];
+
+  if(!archivo){
+    return;
+  }
+
+  if(!comprobarExcel()){
+    event.target.value = "";
+    return;
+  }
+
+  const lector =
+    new FileReader();
+
+  lector.onload = function(e){
+    try{
+      const bytes =
+        new Uint8Array(e.target.result);
+
+      const libro =
+        XLSX.read(bytes,{
+          type:"array"
+        });
+
+      const hojaConfiguracion =
+        libro.Sheets["Configuración"];
+
+      const hojaGastos =
+        libro.Sheets["Gastos"];
+
+      if(!hojaConfiguracion || !hojaGastos){
+        throw new Error(
+          "Faltan las hojas requeridas."
+        );
+      }
+
+      const filasConfiguracion =
+        XLSX.utils.sheet_to_json(
+          hojaConfiguracion,
+          {
+            header:1,
+            defval:""
+          }
+        );
+
+      const mapaConfiguracion = {};
+
+      filasConfiguracion
+        .slice(1)
+        .forEach(fila => {
+          const clave =
+            String(fila[0] || "").trim();
+
+          mapaConfiguracion[clave] =
+            fila[1];
+        });
+
+      const filasGastos =
+        XLSX.utils.sheet_to_json(
+          hojaGastos,
+          {
+            header:1,
+            defval:""
+          }
+        );
+
+      const gastosImportados =
+        filasGastos
+          .slice(1)
+          .filter(fila =>
+            fila[1] ||
+            fila[2] ||
+            fila[3]
+          )
+          .map((fila,index) => ({
+            id:
+              String(
+                fila[0] ||
+                (
+                  Date.now().toString() +
+                  "-" +
+                  index
+                )
+              ),
+
+            fecha:
+              String(
+                fila[1] ||
+                new Date()
+                  .toLocaleString("es-CL")
+              ),
+
+            descripcion:
+              String(fila[2] || ""),
+
+            monto:
+              Number(fila[3] || 0)
+          }))
+          .filter(gasto =>
+            gasto.monto > 0
+          );
+
+      if(!confirm(
+        "¿Importar este respaldo? " +
+        "Se reemplazarán el presupuesto, " +
+        "el período y todos los gastos actuales."
+      )){
+        event.target.value = "";
+        return;
+      }
+
+      presupuestoInicial =
+        Number(
+          mapaConfiguracion[
+            "Presupuesto inicial"
+          ] || 0
+        );
+
+      periodoMes =
+        String(
+          mapaConfiguracion["Mes"] || ""
+        );
+
+      periodoAnio =
+        String(
+          mapaConfiguracion["Año"] || ""
+        );
+
+      /*
+        El Excel está en orden cronológico.
+        La app guarda y muestra primero lo más reciente.
+      */
+      gastos =
+        gastosImportados.reverse();
+
+      guardar();
+
+      document.getElementById(
+        "presupuestoInicial"
+      ).value =
+        presupuestoInicial > 0
+          ? presupuestoInicial
+              .toLocaleString("es-CL")
+          : "";
+
+      render();
+
+      toast(
+        "Respaldo importado",
+        gastos.length +
+          " gasto" +
+          (gastos.length === 1 ? "" : "s") +
+          " recuperado" +
+          (gastos.length === 1 ? "" : "s")
+      );
+
+    }catch(error){
+      alert(
+        "No se pudo importar el archivo. " +
+        "Verifica que sea un respaldo " +
+        "exportado desde Ramen."
+      );
+    }
+
+    event.target.value = "";
+  };
+
+  lector.onerror = function(){
+    alert(
+      "No se pudo leer el archivo seleccionado."
+    );
+
+    event.target.value = "";
+  };
+
+  lector.readAsArrayBuffer(archivo);
+}
+
+
+function render(){
+  const saldo =
+    saldoDisponible();
+
+  const saldoEl =
+    document.getElementById(
+      "saldoDisponible"
+    );
+
+  saldoEl.textContent =
+    formato(saldo);
+
+  saldoEl.className =
+    saldo < 0
+      ? "saldo negative"
+      : "saldo";
+
+  document.getElementById(
+    "periodoActual"
+  ).textContent =
+    periodoMes && periodoAnio
+      ? periodoMes +
+        " " +
+        periodoAnio
+      : "Sin definir";
+
+  document.getElementById(
+    "periodoMes"
+  ).value =
+    periodoMes || "";
+
+  document.getElementById(
+    "periodoAnio"
+  ).value =
+    periodoAnio || "";
+
+  const inputPresupuesto =
+    document.getElementById(
+      "presupuestoInicial"
+    );
+
+  const inputMes =
+    document.getElementById(
+      "periodoMes"
+    );
+
+  const inputAnio =
+    document.getElementById(
+      "periodoAnio"
+    );
+
+  const botonPresupuesto =
+    document.getElementById(
+      "botonPresupuesto"
+    );
+
+  const textoPresupuesto =
+    document.getElementById(
+      "textoPresupuesto"
+    );
+
+  inputPresupuesto.value =
+    presupuestoInicial > 0
+      ? presupuestoInicial
+          .toLocaleString("es-CL")
+      : inputPresupuesto.value;
+
+  if(presupuestoInicial > 0){
+    inputPresupuesto.disabled = true;
+    inputMes.disabled = true;
+    inputAnio.disabled = true;
+    botonPresupuesto.disabled = true;
+
+    botonPresupuesto.textContent =
+      "Presupuesto guardado";
+
+    textoPresupuesto.textContent =
+      "Presupuesto y período bloqueados. " +
+      "Para cambiarlos, reinicia el presupuesto.";
+
+  }else{
+    inputPresupuesto.disabled = false;
+    inputMes.disabled = false;
+    inputAnio.disabled = false;
+    botonPresupuesto.disabled = false;
+
+    botonPresupuesto.textContent =
+      "Guardar presupuesto";
+
+    textoPresupuesto.textContent =
+      "Selecciona mes y año. " +
+      "Una vez guardado, " +
+      "el presupuesto queda bloqueado.";
+  }
+
+  /*
+    Barra de saldo restante.
+    Verde: más de 50%.
+    Naranja: entre 25% y 50%.
+    Roja: menos de 25%.
+  */
+  const barra =
+    document.getElementById(
+      "barraPresupuesto"
+    );
+
+  const porcentajeDisponible =
+    document.getElementById(
+      "porcentajeDisponible"
+    );
+
+  const mensajePresupuesto =
+    document.getElementById(
+      "mensajePresupuesto"
+    );
+
+  const porcentajeRestante =
+    presupuestoInicial > 0
+      ? (
+          saldo /
+          presupuestoInicial
+        ) * 100
+      : 0;
+
+  const anchoBarra =
+    Math.max(
+      0,
+      Math.min(
+        porcentajeRestante,
+        100
+      )
+    );
+
+  let colorBarra =
+    "var(--success)";
+
+  if(porcentajeRestante < 25){
+    colorBarra =
+      "var(--danger)";
+  }else if(porcentajeRestante <= 50){
+    colorBarra =
+      "var(--accent2)";
+  }
+
+  barra.style.width =
+    anchoBarra + "%";
+
+  barra.style.background =
+    colorBarra;
+
+  if(presupuestoInicial <= 0){
+    porcentajeDisponible.textContent =
+      "0% disponible";
+
+    mensajePresupuesto.textContent =
+      "";
+
+    mensajePresupuesto.className =
+      "budget-message small";
+
+  }else if(saldo < 0){
+    barra.style.width = "100%";
+    barra.style.background =
+      "var(--danger)";
+
+    porcentajeDisponible.textContent =
+      "0% disponible";
+
+    mensajePresupuesto.textContent =
+      "Has excedido el presupuesto en " +
+      formato(Math.abs(saldo)) +
+      ".";
+
+    mensajePresupuesto.className =
+      "budget-message negative";
+
+  }else{
+    porcentajeDisponible.textContent =
+      Math.round(
+        porcentajeRestante
+      ) +
+      "% disponible";
+
+    if(porcentajeRestante < 25){
+      mensajePresupuesto.textContent =
+        "Queda menos del 25% del presupuesto.";
+
+      mensajePresupuesto.className =
+        "budget-message negative";
+    }else{
+      mensajePresupuesto.textContent =
+        "";
+
+      mensajePresupuesto.className =
+        "budget-message small";
+    }
+  }
+
+  const historial =
+    document.getElementById(
+      "historial"
+    );
+
+  historial.innerHTML = "";
+
+  if(gastos.length === 0){
+    historial.innerHTML =
+      "<div class='small'>" +
+      "Todavía no hay gastos registrados." +
+      "</div>";
+
+    return;
+  }
+
+  const saldos =
+    calcularSaldosHistoricos();
+
+  gastos.forEach(gasto => {
+    const div =
+      document.createElement("div");
+
+    div.className = "item";
+
+    div.innerHTML = `
+      <div class="row">
+        <div>
+          <strong>
+            ${gasto.descripcion || "(sin descripción)"}
+          </strong>
+          <br>
+
+          -${formato(gasto.monto)}
+          <br>
+
+          <span class="small">
+            ${gasto.fecha}
+          </span>
+          <br>
+
+          <span class="small">
+            Saldo: ${formato(saldos[gasto.id])}
+          </span>
+        </div>
+
+        <div>
+          <button
+            class="danger"
+            onclick="anularGasto('${gasto.id}')"
+          >
+            Anular
+          </button>
+        </div>
+      </div>
+    `;
+
+    historial.appendChild(div);
+  });
+}
+
+
+/*
+  Eventos de formato y flujo rápido.
+*/
+document.getElementById(
+  "presupuestoInicial"
+).addEventListener(
+  "input",
+  function(){
+    formatearMiles(this);
+  }
+);
+
+document.getElementById(
+  "monto"
+).addEventListener(
+  "input",
+  function(){
+    formatearMiles(this);
+  }
+);
+
+document.getElementById(
+  "monto"
+).addEventListener(
+  "keydown",
+  function(event){
+    if(event.key === "Enter"){
+      document.getElementById(
+        "descripcion"
+      ).focus();
+    }
+  }
+);
+
+document.getElementById(
+  "descripcion"
+).addEventListener(
+  "keydown",
+  function(event){
+    if(event.key === "Enter"){
+      agregarGasto();
+    }
+  }
+);
+
+
+/*
+  Restauración inicial.
+*/
+document.getElementById(
+  "presupuestoInicial"
+).value =
+  presupuestoInicial > 0
+    ? presupuestoInicial
+        .toLocaleString("es-CL")
+    : "";
+
+render();
+
+if(presupuestoInicial > 0){
+  document.getElementById(
+    "monto"
+  ).focus();
+}else{
+  document.getElementById(
+    "presupuestoInicial"
+  ).focus();
+}
+</script>
+
+</body>
+</html>
