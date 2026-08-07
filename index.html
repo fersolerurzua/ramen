@@ -167,6 +167,56 @@ button.secondary{
 @media(max-width:520px){
   .backup-actions{grid-template-columns:1fr}
 }
+
+.fold-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  margin-bottom:15px;
+  box-shadow:0 3px 12px rgba(96,58,32,.08);
+  overflow:hidden;
+}
+.fold-header{
+  width:100%;
+  margin:0;
+  padding:16px;
+  background:var(--card);
+  color:var(--text);
+  border:none;
+  border-radius:0;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  text-align:left;
+}
+.fold-title{
+  font-size:17px;
+  font-weight:700;
+}
+.fold-summary{
+  color:var(--muted);
+  font-size:13px;
+  font-weight:400;
+  margin-top:3px;
+}
+.fold-chevron{
+  color:var(--muted);
+  font-size:20px;
+  transition:transform .18s ease;
+}
+.fold-card.open .fold-chevron{
+  transform:rotate(180deg);
+}
+.fold-content{
+  display:none;
+  padding:0 16px 16px;
+  border-top:1px solid var(--border);
+}
+.fold-card.open .fold-content{
+  display:block;
+}
+
 #toast{
   display:none;
   position:fixed;
@@ -211,6 +261,51 @@ button.secondary{
 </div>
 
 <div class="card">
+  <div>Período</div>
+  <div class="small" id="periodoActual">Sin definir</div>
+
+  <br>
+
+  <div>Saldo disponible</div>
+  <div class="saldo" id="saldoDisponible">$0</div>
+
+  <div class="progress">
+    <div class="progress-bar" id="barraPresupuesto"></div>
+  </div>
+
+  <div class="small" id="porcentajeDisponible">0% disponible</div>
+  <div class="budget-message" id="mensajePresupuesto"></div>
+</div>
+
+<div class="card">
+  <h3>Registrar gasto</h3>
+
+  <input
+    type="text"
+    inputmode="numeric"
+    pattern="[0-9.]*"
+    id="monto"
+    placeholder="Monto"
+  >
+
+  <input
+    type="text"
+    id="descripcion"
+    placeholder="Descripción"
+  >
+
+  <button onclick="agregarGasto()">Agregar gasto</button>
+</div>
+
+<div class="fold-card" id="presupuestoCard">
+  <button class="fold-header" type="button" onclick="togglePanel('presupuestoCard')">
+    <div>
+      <div class="fold-title">Presupuesto y período</div>
+      <div class="fold-summary" id="resumenPresupuesto">Sin configurar</div>
+    </div>
+    <div class="fold-chevron">⌄</div>
+  </button>
+  <div class="fold-content">
   <label>Presupuesto inicial</label>
 
   <div class="small" id="textoPresupuesto">
@@ -267,43 +362,8 @@ button.secondary{
   <button id="botonPresupuesto" onclick="guardarPresupuesto()">
     Guardar presupuesto
   </button>
-</div>
 
-<div class="card">
-  <div>Período</div>
-  <div class="small" id="periodoActual">Sin definir</div>
-
-  <br>
-
-  <div>Saldo disponible</div>
-  <div class="saldo" id="saldoDisponible">$0</div>
-
-  <div class="progress">
-    <div class="progress-bar" id="barraPresupuesto"></div>
   </div>
-
-  <div class="small" id="porcentajeDisponible">0% disponible</div>
-  <div class="budget-message" id="mensajePresupuesto"></div>
-</div>
-
-<div class="card">
-  <h3>Registrar gasto</h3>
-
-  <input
-    type="text"
-    inputmode="numeric"
-    pattern="[0-9.]*"
-    id="monto"
-    placeholder="Monto"
-  >
-
-  <input
-    type="text"
-    id="descripcion"
-    placeholder="Descripción"
-  >
-
-  <button onclick="agregarGasto()">Agregar gasto</button>
 </div>
 
 <div class="card">
@@ -336,9 +396,19 @@ button.secondary{
   </div>
 </div>
 
-<div class="card">
+<div class="fold-card" id="historialCard">
+  <button class="fold-header" type="button" onclick="togglePanel('historialCard')">
+    <div>
+      <div class="fold-title">Historial</div>
+      <div class="fold-summary" id="resumenHistorial">Sin gastos</div>
+    </div>
+    <div class="fold-chevron">⌄</div>
+  </button>
+  <div class="fold-content">
   <h3>Historial</h3>
   <div id="historial"></div>
+
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -426,6 +496,12 @@ function saldoDisponible(){
 }
 
 
+
+function togglePanel(id){
+  const panel = document.getElementById(id);
+  panel.classList.toggle("open");
+}
+
 function guardarPresupuesto(){
   if(presupuestoInicial > 0){
     alert(
@@ -462,6 +538,8 @@ function guardarPresupuesto(){
 
   guardar();
   render();
+
+  document.getElementById("presupuestoCard").classList.remove("open");
 
   toast(
     "Presupuesto guardado",
@@ -507,6 +585,7 @@ function agregarGasto(){
 
   if(!presupuestoInicial || presupuestoInicial <= 0){
     alert("Primero guarda un presupuesto.");
+    document.getElementById("presupuestoCard").classList.add("open");
     return;
   }
 
@@ -599,6 +678,8 @@ function reiniciarPresupuesto(){
   document.getElementById(
     "periodoAnio"
   ).value = "";
+
+  document.getElementById("presupuestoCard").classList.add("open");
 
   render();
 
@@ -1000,6 +1081,9 @@ function render(){
       : inputPresupuesto.value;
 
   if(presupuestoInicial > 0){
+    document.getElementById("resumenPresupuesto").textContent =
+      periodoMes + " " + periodoAnio + " · " + formato(presupuestoInicial);
+
     inputPresupuesto.disabled = true;
     inputMes.disabled = true;
     inputAnio.disabled = true;
@@ -1013,6 +1097,9 @@ function render(){
       "Para cambiarlos, reinicia el presupuesto.";
 
   }else{
+    document.getElementById("resumenPresupuesto").textContent =
+      "Sin configurar";
+
     inputPresupuesto.disabled = false;
     inputMes.disabled = false;
     inputAnio.disabled = false;
@@ -1129,6 +1216,20 @@ function render(){
         "budget-message small";
     }
   }
+
+  document.getElementById("resumenHistorial").textContent =
+    gastos.length === 0
+      ? "Sin gastos"
+      : gastos.length +
+        " gasto" +
+        (gastos.length === 1 ? "" : "s") +
+        " · total " +
+        formato(
+          gastos.reduce(
+            (total,gasto) => total + Number(gasto.monto || 0),
+            0
+          )
+        );
 
   const historial =
     document.getElementById(
@@ -1248,6 +1349,10 @@ document.getElementById(
     ? presupuestoInicial
         .toLocaleString("es-CL")
     : "";
+
+if(!presupuestoInicial){
+  document.getElementById("presupuestoCard").classList.add("open");
+}
 
 render();
 
