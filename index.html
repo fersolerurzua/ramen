@@ -1349,6 +1349,12 @@ if(!presupuestoInicial){
   document.getElementById(
     "presupuestoInicial"
   ).focus();
+}else{
+  setTimeout(() => {
+    document.getElementById(
+      "monto"
+    ).focus();
+  }, 100);
 }
 </script>
 
