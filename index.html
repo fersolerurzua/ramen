@@ -305,64 +305,64 @@ button.secondary{
     </div>
     <div class="fold-chevron">⌄</div>
   </button>
+
   <div class="fold-content">
-  <label>Presupuesto inicial</label>
+    <label>Presupuesto inicial</label>
 
-  <div class="small" id="textoPresupuesto">
-    Selecciona mes y año. Una vez guardado, el presupuesto queda bloqueado.
-  </div>
-
-  <div class="periodo-grid">
-    <div>
-      <div class="periodo-label">Mes</div>
-      <select id="periodoMes">
-        <option value="">Seleccionar mes</option>
-        <option value="Enero">Enero</option>
-        <option value="Febrero">Febrero</option>
-        <option value="Marzo">Marzo</option>
-        <option value="Abril">Abril</option>
-        <option value="Mayo">Mayo</option>
-        <option value="Junio">Junio</option>
-        <option value="Julio">Julio</option>
-        <option value="Agosto">Agosto</option>
-        <option value="Septiembre">Septiembre</option>
-        <option value="Octubre">Octubre</option>
-        <option value="Noviembre">Noviembre</option>
-        <option value="Diciembre">Diciembre</option>
-      </select>
+    <div class="small" id="textoPresupuesto">
+      Selecciona mes y año. Una vez guardado, el presupuesto queda bloqueado.
     </div>
 
-    <div>
-      <div class="periodo-label">Año</div>
-      <select id="periodoAnio">
-        <option value="">Seleccionar año</option>
-        <option value="2026">2026</option>
-        <option value="2027">2027</option>
-        <option value="2028">2028</option>
-        <option value="2029">2029</option>
-        <option value="2030">2030</option>
-        <option value="2031">2031</option>
-        <option value="2032">2032</option>
-        <option value="2033">2033</option>
-        <option value="2034">2034</option>
-        <option value="2035">2035</option>
-        <option value="2036">2036</option>
-      </select>
+    <div class="periodo-grid">
+      <div>
+        <div class="periodo-label">Mes</div>
+        <select id="periodoMes">
+          <option value="">Seleccionar mes</option>
+          <option value="Enero">Enero</option>
+          <option value="Febrero">Febrero</option>
+          <option value="Marzo">Marzo</option>
+          <option value="Abril">Abril</option>
+          <option value="Mayo">Mayo</option>
+          <option value="Junio">Junio</option>
+          <option value="Julio">Julio</option>
+          <option value="Agosto">Agosto</option>
+          <option value="Septiembre">Septiembre</option>
+          <option value="Octubre">Octubre</option>
+          <option value="Noviembre">Noviembre</option>
+          <option value="Diciembre">Diciembre</option>
+        </select>
+      </div>
+
+      <div>
+        <div class="periodo-label">Año</div>
+        <select id="periodoAnio">
+          <option value="">Seleccionar año</option>
+          <option value="2026">2026</option>
+          <option value="2027">2027</option>
+          <option value="2028">2028</option>
+          <option value="2029">2029</option>
+          <option value="2030">2030</option>
+          <option value="2031">2031</option>
+          <option value="2032">2032</option>
+          <option value="2033">2033</option>
+          <option value="2034">2034</option>
+          <option value="2035">2035</option>
+          <option value="2036">2036</option>
+        </select>
+      </div>
     </div>
-  </div>
 
-  <input
-    type="text"
-    inputmode="numeric"
-    pattern="[0-9.]*"
-    id="presupuestoInicial"
-    placeholder="Ej. 500.000"
-  >
+    <input
+      type="text"
+      inputmode="numeric"
+      pattern="[0-9.]*"
+      id="presupuestoInicial"
+      placeholder="Ej. 500.000"
+    >
 
-  <button id="botonPresupuesto" onclick="guardarPresupuesto()">
-    Guardar presupuesto
-  </button>
-
+    <button id="botonPresupuesto" onclick="guardarPresupuesto()">
+      Guardar presupuesto
+    </button>
   </div>
 </div>
 
@@ -404,10 +404,10 @@ button.secondary{
     </div>
     <div class="fold-chevron">⌄</div>
   </button>
-  <div class="fold-content">
-  <h3>Historial</h3>
-  <div id="historial"></div>
 
+  <div class="fold-content">
+    <h3>Historial</h3>
+    <div id="historial"></div>
   </div>
 </div>
 
@@ -496,11 +496,11 @@ function saldoDisponible(){
 }
 
 
-
 function togglePanel(id){
   const panel = document.getElementById(id);
   panel.classList.toggle("open");
 }
+
 
 function guardarPresupuesto(){
   if(presupuestoInicial > 0){
@@ -615,12 +615,15 @@ function agregarGasto(){
   descripcionInput.value = "";
 
   /*
-    El cursor vuelve inmediatamente al monto para
-    poder registrar varios gastos seguidos.
+    Quita el foco de los campos para cerrar
+    el teclado del teléfono después de guardar.
   */
-  setTimeout(() => {
-    montoInput.focus();
-  }, 0);
+  montoInput.blur();
+  descripcionInput.blur();
+
+  if(document.activeElement){
+    document.activeElement.blur();
+  }
 
   toast(
     "✓ Gasto registrado",
@@ -756,10 +759,6 @@ function exportarExcel(){
     ]
   ];
 
-  /*
-    En el Excel se muestran cronológicamente:
-    del gasto más antiguo al más reciente.
-  */
   gastos
     .slice()
     .reverse()
@@ -962,10 +961,6 @@ function importarExcel(event){
           mapaConfiguracion["Año"] || ""
         );
 
-      /*
-        El Excel está en orden cronológico.
-        La app guarda y muestra primero lo más reciente.
-      */
       gastos =
         gastosImportados.reverse();
 
@@ -1114,12 +1109,6 @@ function render(){
       "el presupuesto queda bloqueado.";
   }
 
-  /*
-    Barra de saldo restante.
-    Verde: más de 50%.
-    Naranja: entre 25% y 50%.
-    Roja: menos de 25%.
-  */
   const barra =
     document.getElementById(
       "barraPresupuesto"
@@ -1356,11 +1345,7 @@ if(!presupuestoInicial){
 
 render();
 
-if(presupuestoInicial > 0){
-  document.getElementById(
-    "monto"
-  ).focus();
-}else{
+if(!presupuestoInicial){
   document.getElementById(
     "presupuestoInicial"
   ).focus();
