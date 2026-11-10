@@ -18,11 +18,11 @@
   --text:#2F2A26;
   --muted:#7B6D62;
   --border:#E6DDD4;
-  --accent:#B85C38;
-  --accent2:#D98E5F;
+  --accent:#2F805C;
+  --accent2:#72B795;
   --danger:#B23A48;
   --dangerBg:#F9E7E9;
-  --success:#409176;
+  --success:#358969;
 }
 @media (prefers-color-scheme:dark){
   :root{
@@ -31,11 +31,11 @@
     --text:#FFF7EF;
     --muted:#D6BFAE;
     --border:#4A372E;
-    --accent:#D98E5F;
-    --accent2:#F0B27A;
+    --accent:#59B98C;
+    --accent2:#94D7B4;
     --danger:#FF9AA8;
     --dangerBg:#4A222A;
-    --success:#66B99A;
+    --success:#71CDA5;
   }
 }
 body{
@@ -118,9 +118,29 @@ button.secondary{
   width:auto;
   font-size:12px;
   padding:6px 10px;
-  background:rgba(230,221,212,.55);
-  color:var(--muted);
-  border:1px solid var(--border);
+  background:rgba(64,145,118,.12);
+  color:var(--accent);
+  border:1px solid rgba(64,145,118,.30);
+}
+/* Un toque registra el gasto con el medio de pago elegido. */
+.payment-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:10px;
+}
+.payment-actions button{
+  min-height:54px;
+  margin:0;
+  background:var(--accent);
+  color:white;
+  font-size:16px;
+}
+.payment-actions button:last-child{
+  background:#236B50;
+}
+@media (prefers-color-scheme:dark){
+  .payment-actions button:last-child{background:#367E60;}
 }
 .saldo{
   font-size:34px;
@@ -180,7 +200,7 @@ button.secondary{
   width:100%;
   margin:0;
   padding:16px;
-  background:var(--card);
+  background:rgba(64,145,118,.08);
   color:var(--text);
   border:none;
   border-radius:0;
@@ -294,7 +314,11 @@ button.secondary{
     placeholder="Descripción"
   >
 
-  <button onclick="agregarGasto()">Agregar gasto</button>
+  <div class="small">Agregar gasto con:</div>
+  <div class="payment-actions">
+    <button type="button" onclick="agregarGasto('Débito')">Débito</button>
+    <button type="button" onclick="agregarGasto('Crédito')">Crédito</button>
+  </div>
 </div>
 
 <div class="fold-card" id="presupuestoCard">
@@ -570,7 +594,7 @@ function toast(titulo, detalle=""){
 }
 
 
-function agregarGasto(){
+function agregarGasto(medioPago="Débito"){
   const montoInput =
     document.getElementById("monto");
 
@@ -605,7 +629,8 @@ function agregarGasto(){
       new Date().toLocaleString("es-CL"),
 
     monto,
-    descripcion
+    descripcion,
+    medioPago
   });
 
   guardar();
@@ -755,7 +780,8 @@ function exportarExcel(){
       "Fecha",
       "Descripción",
       "Monto",
-      "Saldo después del gasto"
+      "Saldo después del gasto",
+      "Medio de pago"
     ]
   ];
 
@@ -768,7 +794,8 @@ function exportarExcel(){
         gasto.fecha,
         gasto.descripcion || "",
         Number(gasto.monto),
-        Number(saldos[gasto.id])
+        Number(saldos[gasto.id]),
+        gasto.medioPago || ""
       ]);
     });
 
@@ -791,7 +818,8 @@ function exportarExcel(){
     {wch:22},
     {wch:36},
     {wch:15},
-    {wch:24}
+    {wch:24},
+    {wch:18}
   ];
 
   XLSX.utils.book_append_sheet(
@@ -929,7 +957,12 @@ function importarExcel(event){
               String(fila[2] || ""),
 
             monto:
-              Number(fila[3] || 0)
+              Number(fila[3] || 0),
+
+            medioPago:
+              ["Débito", "Crédito"].includes(String(fila[5] || "").trim())
+                ? String(fila[5]).trim()
+                : ""
           }))
           .filter(gasto =>
             gasto.monto > 0
@@ -1258,6 +1291,11 @@ function render(){
 
           <span class="small">
             ${gasto.fecha}
+          </span>
+          <br>
+
+          <span class="small">
+            Medio de pago: ${gasto.medioPago || "Sin especificar"}
           </span>
           <br>
 
