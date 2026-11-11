@@ -142,6 +142,40 @@ button.secondary{
 @media (prefers-color-scheme:dark){
   .payment-actions button:last-child{background:#367E60;}
 }
+.split-balances{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:14px;
+}
+.split-balance{
+  border:1px solid var(--border);
+  background:rgba(64,145,118,.07);
+  border-radius:12px;
+  padding:12px;
+  min-width:0;
+}
+.split-balance .amount{
+  font-size:24px;
+  font-weight:800;
+  margin:5px 0 3px;
+  overflow-wrap:anywhere;
+}
+.split-balance .amount.negative{color:var(--danger)}
+.payment-actions button .remaining{
+  display:block;
+  font-size:12px;
+  font-weight:500;
+  opacity:.9;
+  margin-top:4px;
+}
+.split-warning{margin-top:10px;}
+.split-edit{margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.split-edit .periodo-label{margin-top:2px}
+.split-edit button{margin-top:8px}
+@media(max-width:390px){
+  .split-balance .amount{font-size:20px}
+}
 .saldo{
   font-size:34px;
   font-weight:800;
@@ -295,6 +329,20 @@ button.secondary{
 
   <div class="small" id="porcentajeDisponible">0% disponible</div>
   <div class="budget-message" id="mensajePresupuesto"></div>
+
+  <div class="split-balances">
+    <div class="split-balance">
+      <div><strong>Débito</strong></div>
+      <div class="amount" id="saldoDebito">$50.000</div>
+      <div class="small" id="detalleDebito">de $50.000 asignados</div>
+    </div>
+    <div class="split-balance">
+      <div><strong>Crédito</strong></div>
+      <div class="amount" id="saldoCredito">$300.000</div>
+      <div class="small" id="detalleCredito">de $300.000 asignados</div>
+    </div>
+  </div>
+  <div class="small split-warning" id="avisoDistribucion"></div>
 </div>
 
 <div class="card">
@@ -316,8 +364,8 @@ button.secondary{
 
   <div class="small">Agregar gasto con:</div>
   <div class="payment-actions">
-    <button type="button" onclick="agregarGasto('Débito')">Débito</button>
-    <button type="button" onclick="agregarGasto('Crédito')">Crédito</button>
+    <button type="button" id="botonDebito" onclick="agregarGasto('Débito')">Débito<span class="remaining" id="restanteBotonDebito"></span></button>
+    <button type="button" id="botonCredito" onclick="agregarGasto('Crédito')">Crédito<span class="remaining" id="restanteBotonCredito"></span></button>
   </div>
 </div>
 
@@ -387,6 +435,42 @@ button.secondary{
     <button id="botonPresupuesto" onclick="guardarPresupuesto()">
       Guardar presupuesto
     </button>
+
+    <div class="split-edit">
+      <strong>Distribución por medio de pago</strong>
+      <div class="small">Puedes modificar estos montos sin borrar gastos. Deben sumar el presupuesto general.</div>
+      <div class="periodo-grid">
+        <div>
+          <div class="periodo-label">Débito</div>
+          <input type="text" inputmode="numeric" id="presupuestoDebito" placeholder="50.000">
+        </div>
+        <div>
+          <div class="periodo-label">Crédito</div>
+          <input type="text" inputmode="numeric" id="presupuestoCredito" placeholder="300.000">
+        </div>
+      </div>
+      <button type="button" id="botonDistribucion" onclick="guardarDistribucion()">Guardar distribución</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="fold-card" id="syncCard">
+  <button class="fold-header" type="button" onclick="togglePanel('syncCard')">
+    <div><div class="fold-title">Sincronización con Google Sheets</div>
+    <div class="fold-summary" id="syncStatus">Sin configurar</div></div>
+    <div class="fold-chevron">⌄</div>
+  </button>
+  <div class="fold-content">
+    <div class="small">Introduce la dirección de la implementación web de Apps Script y tu clave personal. Se guardarán en este navegador, no en GitHub. La clave se envía mediante POST, nunca en la URL.</div>
+    <label for="syncUrl">URL de Apps Script (/exec)</label>
+    <input type="url" id="syncUrl" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+    <label for="syncKey">Clave de sincronización</label>
+    <input type="password" id="syncKey" placeholder="Clave configurada en Script Properties" autocomplete="off">
+    <button type="button" onclick="guardarConexion()">Guardar conexión</button>
+    <button type="button" class="secondary" onclick="probarConexion()">Probar conexión</button>
+    <button type="button" class="secondary" onclick="sincronizarPendientes()">Sincronizar pendientes</button>
+    <div class="small" id="syncDetail"></div>
   </div>
 </div>
 
@@ -456,6 +540,29 @@ let gastos = JSON.parse(
   localStorage.getItem("gastos") || "[]"
 );
 
+// La distribución es independiente del presupuesto general y se puede editar.
+// Las claves existentes se mantienen para conservar los gastos previos.
+const DISTRIBUCION_INICIAL = {"Débito":50000, "Crédito":300000};
+function leerDistribucionGuardada(){
+  try{
+    const datos = JSON.parse(localStorage.getItem("distribucionRamen") || "null");
+    if(datos && Number.isFinite(Number(datos["Débito"])) &&
+       Number.isFinite(Number(datos["Crédito"])) &&
+       Number(datos["Débito"]) >= 0 && Number(datos["Crédito"]) >= 0){
+      return {"Débito":Number(datos["Débito"]),"Crédito":Number(datos["Crédito"])};
+    }
+  }catch(error){}
+  return {...DISTRIBUCION_INICIAL};
+}
+let distribucion = leerDistribucionGuardada();
+
+function gastoPorMedio(medio){
+  return gastos.reduce((total,gasto) =>
+    total + (gasto.medioPago === medio ? Number(gasto.monto || 0) : 0), 0);
+}
+function restantePorMedio(medio){
+  return distribucion[medio] - gastoPorMedio(medio);
+}
 
 function formato(n){
   const signo = n < 0 ? "-" : "";
@@ -507,6 +614,7 @@ function guardar(){
     "gastos",
     JSON.stringify(gastos)
   );
+  localStorage.setItem("distribucionRamen",JSON.stringify(distribucion));
 }
 
 
@@ -525,6 +633,27 @@ function togglePanel(id){
   panel.classList.toggle("open");
 }
 
+
+function guardarDistribucion(){
+  const debito = leerMonto(document.getElementById("presupuestoDebito"));
+  const credito = leerMonto(document.getElementById("presupuestoCredito"));
+  const total = presupuestoInicial > 0
+    ? presupuestoInicial
+    : leerMonto(document.getElementById("presupuestoInicial"));
+
+  if(!total || total <= 0){
+    alert("Primero ingresa o guarda el presupuesto general.");
+    return;
+  }
+  if(debito + credito !== total){
+    alert("Débito y crédito deben sumar " + formato(total) + ".");
+    return;
+  }
+  distribucion = {"Débito":debito,"Crédito":credito};
+  guardar();
+  render();
+  toast("Distribución guardada", "Débito " + formato(debito) + " · Crédito " + formato(credito));
+}
 
 function guardarPresupuesto(){
   if(presupuestoInicial > 0){
@@ -560,6 +689,8 @@ function guardarPresupuesto(){
     return;
   }
 
+  // Permite guardar el presupuesto general sin perder una distribución previa.
+  // Si no suma lo mismo, se solicita ajustarla en el panel.
   guardar();
   render();
 
@@ -634,6 +765,7 @@ function agregarGasto(medioPago="Débito"){
   });
 
   guardar();
+  encolarRamen("upsert",gastos[0]);
   render();
 
   montoInput.value = "";
@@ -651,11 +783,23 @@ function agregarGasto(medioPago="Débito"){
   }
 
   toast(
-    "✓ Gasto registrado",
-    "Saldo disponible: " + formato(saldoDisponible())
+    "✓ Gasto con " + medioPago,
+    "Quedan " + formato(restantePorMedio(medioPago)) +
+      " · Total " + formato(saldoDisponible())
   );
 }
 
+
+function asignarMedioGasto(id,medioPago){
+  if(medioPago !== "Débito" && medioPago !== "Crédito") return;
+  const gasto = gastos.find(item => item.id === id);
+  if(!gasto) return;
+  gasto.medioPago = medioPago;
+  guardar();
+  encolarRamen("upsert",gasto);
+  render();
+  toast("Medio asignado", medioPago + " · " + formato(gasto.monto));
+}
 
 function anularGasto(id){
   if(!confirm("¿Anular este gasto?")){
@@ -666,6 +810,7 @@ function anularGasto(id){
     gastos.filter(gasto => gasto.id !== id);
 
   guardar();
+  encolarRamen("delete",{id});
   render();
 
   toast(
@@ -688,10 +833,13 @@ function reiniciarPresupuesto(){
     return;
   }
 
+  // Conservar eliminaciones pendientes para no dejar movimientos huérfanos en Sheets.
+  gastos.forEach(g=>encolarRamen("delete",{id:g.id}));
   presupuestoInicial = 0;
   periodoMes = "";
   periodoAnio = "";
   gastos = [];
+  distribucion = {...DISTRIBUCION_INICIAL};
 
   guardar();
 
@@ -767,6 +915,10 @@ function exportarExcel(){
     ["Mes",periodoMes],
     ["Año",periodoAnio],
     ["Presupuesto inicial",presupuestoInicial],
+    ["Presupuesto débito",distribucion["Débito"]],
+    ["Presupuesto crédito",distribucion["Crédito"]],
+    ["Saldo débito",restantePorMedio("Débito")],
+    ["Saldo crédito",restantePorMedio("Crédito")],
     ["Saldo disponible",saldoDisponible()],
     [
       "Fecha de exportación",
@@ -994,10 +1146,26 @@ function importarExcel(event){
           mapaConfiguracion["Año"] || ""
         );
 
+      // Si se importa un respaldo, sincronizar los cambios de ese respaldo.
+      const idsImportados=new Set(gastosImportados.map(g=>g.id));
+      gastos.filter(g=>!idsImportados.has(g.id)).forEach(g=>encolarRamen("delete",{id:g.id}));
       gastos =
         gastosImportados.reverse();
 
+      // Los respaldos anteriores no tienen estas filas: conservamos los valores
+      // sugeridos de 50.000 y 300.000, que pueden editarse en la aplicación.
+      const debitoImportado = Number(mapaConfiguracion["Presupuesto débito"]);
+      const creditoImportado = Number(mapaConfiguracion["Presupuesto crédito"]);
+      distribucion = (
+        mapaConfiguracion["Presupuesto débito"] !== undefined &&
+        mapaConfiguracion["Presupuesto crédito"] !== undefined &&
+        Number.isFinite(debitoImportado) && Number.isFinite(creditoImportado) &&
+        debitoImportado >= 0 && creditoImportado >= 0
+      ) ? {"Débito":debitoImportado,"Crédito":creditoImportado}
+        : {...DISTRIBUCION_INICIAL};
+
       guardar();
+      gastos.forEach(g=>encolarRamen("upsert",g));
 
       document.getElementById(
         "presupuestoInicial"
@@ -1057,6 +1225,38 @@ function render(){
     saldo < 0
       ? "saldo negative"
       : "saldo";
+
+  for(const [medio, sufijo] of [["Débito","Debito"],["Crédito","Credito"]]){
+    const restante = restantePorMedio(medio);
+    const saldoMedio = document.getElementById("saldo" + sufijo);
+    saldoMedio.textContent = formato(restante);
+    saldoMedio.className = restante < 0 ? "amount negative" : "amount";
+    document.getElementById("detalle" + sufijo).textContent =
+      "de " + formato(distribucion[medio]) + " asignados";
+    document.getElementById("restanteBoton" + sufijo).textContent =
+      "Quedan " + formato(restante);
+  }
+  document.getElementById("presupuestoDebito").value =
+    distribucion["Débito"].toLocaleString("es-CL");
+  document.getElementById("presupuestoCredito").value =
+    distribucion["Crédito"].toLocaleString("es-CL");
+
+  const avisos = [];
+  if(presupuestoInicial > 0 &&
+     distribucion["Débito"] + distribucion["Crédito"] !== presupuestoInicial){
+    avisos.push("Las asignaciones suman " +
+      formato(distribucion["Débito"] + distribucion["Crédito"]) +
+      ", pero el presupuesto general es " + formato(presupuestoInicial) +
+      ". Ajusta los montos en «Presupuesto y período».");
+  }
+  const sinMedio = gastos.filter(gasto =>
+    gasto.medioPago !== "Débito" && gasto.medioPago !== "Crédito");
+  if(sinMedio.length){
+    avisos.push(sinMedio.length + " gasto(s) anterior(es) sin medio de pago: " +
+      "se descuentan del saldo general, pero todavía no de Débito o Crédito. " +
+      "Puedes asignarles un medio en el historial.");
+  }
+  document.getElementById("avisoDistribucion").textContent = avisos.join(" ");
 
   document.getElementById(
     "periodoActual"
@@ -1297,6 +1497,12 @@ function render(){
           <span class="small">
             Medio de pago: ${gasto.medioPago || "Sin especificar"}
           </span>
+          ${!gasto.medioPago ? `
+            <div class="small">Asignar este gasto:
+              <button class="secondary" type="button" onclick="asignarMedioGasto('${gasto.id}','Débito')">Débito</button>
+              <button class="secondary" type="button" onclick="asignarMedioGasto('${gasto.id}','Crédito')">Crédito</button>
+            </div>
+          ` : ""}
           <br>
 
           <span class="small">
@@ -1332,6 +1538,12 @@ document.getElementById(
   }
 );
 
+for(const id of ["presupuestoDebito","presupuestoCredito"]){
+  document.getElementById(id).addEventListener("input",function(){
+    formatearMiles(this);
+  });
+}
+
 document.getElementById(
   "monto"
 ).addEventListener(
@@ -1360,11 +1572,111 @@ document.getElementById(
   "keydown",
   function(event){
     if(event.key === "Enter"){
-      agregarGasto();
+      // Evita registrar accidentalmente un débito sin elegir medio de pago.
+      document.getElementById("botonDebito").focus();
     }
   }
 );
 
+
+
+/* Envío POST por formulario a iframe: la clave no aparece en la URL.
+   Apps Script devuelve confirmación por postMessage (sin CORS ni JSONP).
+   La clave se conserva localmente; no es autenticación de alta seguridad. */
+const RAMEN_SYNC_URL_KEY = "ramenSyncUrl";
+const RAMEN_SYNC_SECRET_KEY = "ramenSyncSecret";
+const RAMEN_SYNC_QUEUE_KEY = "ramenSyncQueueV1";
+let ramenSyncBusy = false;
+let ramenSyncQueue = leerColaRamen();
+function leerColaRamen(){
+  try { const q=JSON.parse(localStorage.getItem(RAMEN_SYNC_QUEUE_KEY)||"[]"); return Array.isArray(q)?q:[]; }
+  catch(e){ return []; }
+}
+function guardarColaRamen(){localStorage.setItem(RAMEN_SYNC_QUEUE_KEY,JSON.stringify(ramenSyncQueue));mostrarEstadoSync();}
+function configRamen(){return {url:(localStorage.getItem(RAMEN_SYNC_URL_KEY)||"").trim(),key:localStorage.getItem(RAMEN_SYNC_SECRET_KEY)||""};}
+function mostrarEstadoSync(mensaje){
+  const c=configRamen();
+  const el=document.getElementById("syncStatus");
+  if(el)el.textContent=(c.url&&c.key?"Configurado":"Sin configurar")+" · "+ramenSyncQueue.length+" pendiente(s)";
+  const d=document.getElementById("syncDetail");if(d&&mensaje)d.textContent=mensaje;
+}
+function guardarConexion(){
+  const url=document.getElementById("syncUrl").value.trim();
+  const key=document.getElementById("syncKey").value.trim();
+  if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/?#]+\/exec$/.test(url)||!key){alert("Introduce la URL /exec de Apps Script y una clave.");return;}
+  localStorage.setItem(RAMEN_SYNC_URL_KEY,url);localStorage.setItem(RAMEN_SYNC_SECRET_KEY,key);
+  mostrarEstadoSync("Conexión guardada en este navegador.");sincronizarPendientes();
+}
+function ramenPost(action,entry){
+  const {url,key}=configRamen();
+  return new Promise((resolve,reject)=>{
+    if(!url||!key){reject(new Error("Configura Apps Script y la clave"));return;}
+    const nonce=Array.from(crypto.getRandomValues(new Uint8Array(24)),v=>v.toString(16).padStart(2,"0")).join("");
+    const iframe=document.createElement("iframe");
+    iframe.name="ramen_response_"+nonce;
+    iframe.style.display="none";
+    const form=document.createElement("form");
+    form.method="POST";form.action=url;form.target=iframe.name;form.style.display="none";
+    const fields={action,key,nonce,origin:location.origin,data:JSON.stringify(entry||{})};
+    for(const [name,value] of Object.entries(fields)){
+      const input=document.createElement("input");input.type="hidden";input.name=name;input.value=value;form.appendChild(input);
+    }
+    let finished=false;
+    function finish(error,data){
+      if(finished)return;finished=true;clearTimeout(timer);
+      window.removeEventListener("message",onMessage);form.remove();iframe.remove();
+      error?reject(error):resolve(data);
+    }
+    function onMessage(event){
+      if(!/^https:\/\/(?:[a-z0-9-]+\.)?googleusercontent\.com$|^https:\/\/script\.google\.com$/.test(event.origin))return;
+      const payload=event.data;
+      if(!payload||payload.type!=="ramen-sync-result"||payload.nonce!==nonce)return;
+      finish(null,payload.response);
+    }
+    window.addEventListener("message",onMessage);
+    const timer=setTimeout(()=>finish(new Error("No llegó confirmación de Apps Script (25 s)")),25000);
+    document.body.append(iframe,form);form.submit();
+  });
+}
+function gastoParaSync(g){
+  return {id:String(g.id),fecha:String(g.fecha||""),descripcion:String(g.descripcion||""),
+    monto:Number(g.monto||0),medioPago:String(g.medioPago||""),
+    mes:String(periodoMes||""),anio:String(periodoAnio||"")};
+}
+function encolarRamen(action,g){
+  if(!g||!g.id)return;
+  const item={action,id:String(g.id),data:action==="upsert"?gastoParaSync(g):null};
+  ramenSyncQueue=ramenSyncQueue.filter(q=>q.id!==item.id);
+  ramenSyncQueue.push(item);guardarColaRamen();sincronizarPendientes();
+}
+async function sincronizarPendientes(){
+  if(ramenSyncBusy)return;
+  const c=configRamen();if(!c.url||!c.key){mostrarEstadoSync("Configura la conexión para sincronizar.");return;}
+  ramenSyncBusy=true;
+  try{
+    while(ramenSyncQueue.length){
+      const item=ramenSyncQueue[0];
+      const r=await ramenPost(item.action,item.action==="upsert"?item.data:{id:item.id});
+      if(!r||r.ok!==true)throw new Error(r&&r.error?r.error:"Respuesta no válida");
+      // Puede haberse reemplazado el movimiento durante la petición.
+      if(ramenSyncQueue[0]===item)ramenSyncQueue.shift();
+      guardarColaRamen();
+    }
+    mostrarEstadoSync("Todos los cambios están sincronizados.");
+  }catch(e){mostrarEstadoSync("Pendiente: "+e.message+". Puedes reintentar con «Sincronizar pendientes».");}
+  finally{ramenSyncBusy=false;}
+}
+async function probarConexion(){
+  try{const r=await ramenPost("ping");if(!r||!r.ok)throw new Error(r?.error||"Sin respuesta");mostrarEstadoSync("Conexión comprobada correctamente.");sincronizarPendientes();}
+  catch(e){mostrarEstadoSync("Error de conexión: "+e.message);}
+}
+function iniciarSyncRamen(){
+  const c=configRamen();document.getElementById("syncUrl").value=c.url;
+  document.getElementById("syncKey").value=c.key;
+  mostrarEstadoSync();if(!c.url||!c.key)document.getElementById("syncCard").classList.add("open");
+  window.addEventListener("online",()=>sincronizarPendientes());
+  if(c.url&&c.key)sincronizarPendientes();
+}
 
 /*
   Restauración inicial.
@@ -1382,6 +1694,7 @@ if(!presupuestoInicial){
 }
 
 render();
+iniciarSyncRamen();
 
 if(!presupuestoInicial){
   document.getElementById(
