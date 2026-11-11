@@ -1607,23 +1607,36 @@ function guardarConexion(){
   localStorage.setItem(RAMEN_SYNC_URL_KEY,url);localStorage.setItem(RAMEN_SYNC_SECRET_KEY,key);
   mostrarEstadoSync("Conexión guardada en este navegador.");sincronizarPendientes();
 }
+function ramenConsultarRecibo(url,nonce){
+  return new Promise((resolve,reject)=>{
+    const callback="ramenReceipt_"+nonce;
+    const script=document.createElement("script");
+    let done=false;
+    const timer=setTimeout(()=>finish(new Error("Sin confirmación de recibo")),9000);
+    function finish(err,result){
+      if(done)return;done=true;clearTimeout(timer);delete window[callback];script.remove();
+      err?reject(err):resolve(result);
+    }
+    window[callback]=(result)=>finish(null,result);
+    script.onerror=()=>finish(new Error("No se pudo consultar el recibo"));
+    script.src=url+"?nonce="+encodeURIComponent(nonce)+"&callback="+callback+"&t="+Date.now();
+    document.head.appendChild(script);
+  });
+}
 function ramenPost(action,entry){
   const {url,key}=configRamen();
   return new Promise((resolve,reject)=>{
     if(!url||!key){reject(new Error("Configura Apps Script y la clave"));return;}
     const nonce=Array.from(crypto.getRandomValues(new Uint8Array(24)),v=>v.toString(16).padStart(2,"0")).join("");
-    const iframe=document.createElement("iframe");
-    iframe.name="ramen_response_"+nonce;
-    iframe.style.display="none";
-    const form=document.createElement("form");
-    form.method="POST";form.action=url;form.target=iframe.name;form.style.display="none";
+    const iframe=document.createElement("iframe");iframe.name="ramen_response_"+nonce;iframe.style.display="none";
+    const form=document.createElement("form");form.method="POST";form.action=url;form.target=iframe.name;form.style.display="none";
     const fields={action,key,nonce,origin:location.origin,data:JSON.stringify(entry||{})};
     for(const [name,value] of Object.entries(fields)){
       const input=document.createElement("input");input.type="hidden";input.name=name;input.value=value;form.appendChild(input);
     }
     let finished=false;
     function finish(error,data){
-      if(finished)return;finished=true;clearTimeout(timer);
+      if(finished)return;finished=true;clearTimeout(timeout);
       window.removeEventListener("message",onMessage);form.remove();iframe.remove();
       error?reject(error):resolve(data);
     }
@@ -1634,8 +1647,19 @@ function ramenPost(action,entry){
       finish(null,payload.response);
     }
     window.addEventListener("message",onMessage);
-    const timer=setTimeout(()=>finish(new Error("No llegó confirmación de Apps Script (25 s)")),25000);
+    const timeout=setTimeout(()=>finish(new Error("No llegó confirmación de Apps Script")),35000);
     document.body.append(iframe,form);form.submit();
+    // El recibo es la vía principal de confirmación; postMessage queda como respaldo.
+    (async()=>{
+      for(let i=0;i<7&&!finished;i++){
+        await new Promise(r=>setTimeout(r,1600));
+        if(finished)return;
+        try{
+          const receipt=await ramenConsultarRecibo(url,nonce);
+          if(receipt&&receipt.ready){finish(null,{ok:receipt.ok,error:receipt.error});return;}
+        }catch(e){/* Un fallo temporal no implica que la escritura haya fallado. */}
+      }
+    })();
   });
 }
 function gastoParaSync(g){
